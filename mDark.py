@@ -82,9 +82,9 @@ class DarkProcess(cpl.ui.PyRecipe):
         method = self.parameters["mdark.stacking.method"].value
 
         if method == "mean":
-            processed_dark_images.collapse_create()
+            combined_image = processed_dark_images.collapse_create()
         elif method == "median":
-            processed_dark_images.collapse_median_create()
+            combined_image = processed_dark_images.collapse_median_create()
 
         product_properties = cpl.core.PropertyList()
         product_properties.append(
