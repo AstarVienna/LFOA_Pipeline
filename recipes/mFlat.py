@@ -5,21 +5,22 @@ import cpl.drs
 
 from typing import Any, Dict
 
-class DarkProcess(cpl.ui.PyRecipe):
-    _name = "dark_processor"
+class FlatProcess(cpl.ui.PyRecipe):
+    _name = "flat_processor"
     _version = "0.1"
     _author = "Benjamin Eisele"
     _email = "benjamin.eisele0101@gmail.com"
     _copyright = "GPL-3.0-or-later"
-    _synopsis = "Basic Bias processor"
-    _description = "This recipe takes a number of raw dark frames, subtracts the bias and produces a master dark."
+    _synopsis = "Basic Flat processor"
+    _description = "This recipe takes a number of raw flat frames, subtracts the bias and produces a master flat."
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.parameters = cpl.ui.ParameterList(
             (
                 cpl.ui.ParameterEnum(
-                    name = "mdark.stacking.method",
-                    context = "mdark",
+                    name = "mflat.stacking.method",
+                    context = "mflat",
                     description = "Method used for averaging",
                     default = "mean",
                     alternatives = ("mean", "median"),
@@ -27,7 +28,7 @@ class DarkProcess(cpl.ui.PyRecipe):
             )
         )
 
-    def run(self, frameset:cpl.ui.FrameSet, settings: Dict[str, Any]) -> cpl.ui.FrameSet:
+    def run(self, frameset:cpl.ui.FrameSet, settings: Dict[str, Any]) -> cpl.ui.FrameSet:       
         for key, value in settings.items():
             try:
                 self.parameters[key].value = value
@@ -36,55 +37,79 @@ class DarkProcess(cpl.ui.PyRecipe):
                         self._name,
                         f"Settings includes {key}:{value} but {self} has no parameter named {key}.",
                     )
-        
-        output_file = "MASTER_DARK.fits"
-        
-        raw_Dark_Frames = cpl.ui.FrameSet()
+    
+
+        output_file = "MASTER_FLAT.fits"
+
+        raw_flat_frames = cpl.ui.FrameSet()
         bias_frame = None
+        dark_frame = None
         product_frames = cpl.ui.FrameSet()
 
         for frame in frameset:
-            if frame.tag == "DARK":
+            if frame.tag == "FLAT":
                 frame.group = cpl.ui.Frame.FrameGroup.RAW
-                raw_Dark_Frames.append(frame)
+                raw_flat_frames.append(frame)
             elif frame.tag == "MASTER_BIAS":
                 frame.group = cpl.ui.Frame.FrameGroup.CALIB
                 bias_frame = frame
+            elif frame.tag == "MASTER_DARK":
+                frame.group = cpl.ui.Frame.FrameGroup.CALIB
+                dark_frame = frame
             else:
                 cpl.core.Msg.warning(
-                    self.name,
-                    f"Got frame {frame.file!r} with unexpected tag {frame.tag!r}, ignoring."
+                    component=self.name,
+                    message=f"Got frame {frame.file!r} with unexpected tag {frame.tag!r}, ignoring."
                 )
-        
-        if len(raw_Dark_Frames) == 0:
+
+        if len(raw_flat_frames) == 0:
             cpl.core.Msg.error(
                 self.name,
                 f"No raw frames in frameset."
             )
+        
+        processed_flat_images = cpl.core.ImageList()
 
-        processed_dark_images = cpl.core.ImageList()
+        cpl.core.Msg.warning(
+            self.name,
+            f"Loading calib files."
+        )
 
         if bias_frame:
             bias_image = cpl.core.Image.load(bias_frame.file)
 
-        for idx, frame in enumerate(raw_Dark_Frames):
+        cpl.core.Msg.warning(
+            self.name,
+            f"Loading dark."
+        )
+
+        if dark_frame:
+            dark_image = cpl.core.Image.load(dark_frame.file)
+        
+        cpl.core.Msg.warning(
+            self.name,
+            f"Preparing flat field."
+        )
+        for idx, frame in enumerate(raw_flat_frames):
             if idx == 0:
                 header = cpl.core.PropertyList.load(frame.file, 0)
             
-            raw_dark_image = cpl.core.Image.load(frame.file)
+            raw_flat_image = cpl.core.Image.load(frame.file)
 
-            raw_dark_image.subtract(bias_image)
-
-            processed_dark_images.insert(idx, raw_dark_image)
+            raw_flat_image.subtract(bias_image)
+            raw_flat_image.subtract(dark_image)
+            median = raw_flat_image.get_median()
+            raw_flat_image.divide_scalar(median)
+            processed_flat_images.insert(idx, raw_flat_image)
 
         combined_image = None
 
-        method = self.parameters["mdark.stacking.method"].value
+        method = self.parameters["mflat.stacking.method"].value
 
         if method == "mean":
-            combined_image = processed_dark_images.collapse_create()
+            combined_image = processed_flat_images.collapse_create()
         elif method == "median":
-            combined_image = processed_dark_images.collapse_median_create()
+            combined_image = processed_flat_images.collapse_median_create()
 
         product_properties = cpl.core.PropertyList()
         product_properties.append(
@@ -108,12 +133,9 @@ class DarkProcess(cpl.ui.PyRecipe):
         product_frames.append(
             cpl.ui.Frame(
                 file=output_file,
-                tag="MASTER_DARK",
+                tag="MASTER_FLAT",
                 group=cpl.ui.Frame.FrameGroup.CALIB,
             )
         )
 
         return product_frames
-    
-
-
