@@ -44,7 +44,7 @@ class ScienceProcess(cpl.ui.PyRecipe):
         bias_frame = None
         dark_frame = None
         flat_frame = None
-        product_frames = None
+        product_frames = cpl.ui.FrameSet()
 
         for frame in frameset:
             if frame.tag == "SCIENCE":
@@ -70,14 +70,14 @@ class ScienceProcess(cpl.ui.PyRecipe):
                 self.name,
                 f"No raw frames in frameset."
             )
-        processed_science_images = cpl.ui.FrameSet(raw_science_frames)
+        processed_science_images = cpl.core.ImageList()
 
         if bias_frame:
-            bias_image = cpl.core.Image.load(bias_frame)
+            bias_image = cpl.core.Image.load(bias_frame.file)
         if dark_frame:
-            dark_image = cpl.core.Image.load(dark_frame)
+            dark_image = cpl.core.Image.load(dark_frame.file)
         if flat_frame:
-            flat_image = cpl.core.Image.load(flat_frame)
+            flat_image = cpl.core.Image.load(flat_frame.file)
 
         for idx, frame in enumerate(raw_science_frames):
             if idx == 0:
@@ -87,7 +87,7 @@ class ScienceProcess(cpl.ui.PyRecipe):
 
             raw_science_image.subtract(bias_image)
             raw_science_image.subtract(dark_image)
-            raw_science_image.divide_scalar(flat_image)
+            raw_science_image.divide(flat_image)
 
             processed_science_images.insert(idx, raw_science_image)
 
