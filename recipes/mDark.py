@@ -2,6 +2,7 @@ import cpl.core
 import cpl.ui
 import cpl.dfs
 import cpl.drs
+import re
 
 from typing import Any, Dict
 
@@ -41,6 +42,7 @@ class DarkProcess(cpl.ui.PyRecipe):
         
         raw_Dark_Frames = cpl.ui.FrameSet()
         bias_frame = None
+        match = None
         product_frames = cpl.ui.FrameSet()
 
         for frame in frameset:
@@ -70,7 +72,10 @@ class DarkProcess(cpl.ui.PyRecipe):
         for idx, frame in enumerate(raw_Dark_Frames):
             if idx == 0:
                 header = cpl.core.PropertyList.load(frame.file, 0)
-            
+                pattern = r'value\s+:\s+(\d+)'
+                exp_time_list = cpl.core.PropertyList.load_regexp(frame.file, 0, "EXPTIME", False)
+                exp_time = exp_time_list.dump(show=False)
+                match = re.search(pattern, exp_time)
             raw_dark_image = cpl.core.Image.load(frame.file)
 
             raw_dark_image.subtract(bias_image)
@@ -85,6 +90,8 @@ class DarkProcess(cpl.ui.PyRecipe):
             combined_image = processed_dark_images.collapse_create()
         elif method == "median":
             combined_image = processed_dark_images.collapse_median_create()
+
+        combined_image.divide_scalar(float(match.group(1)))
 
         product_properties = cpl.core.PropertyList()
         product_properties.append(

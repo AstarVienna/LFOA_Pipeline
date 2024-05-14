@@ -2,6 +2,7 @@ import cpl.core
 import cpl.ui
 import cpl.dfs
 import cpl.drs
+import re
 
 from typing import Any, Dict
 
@@ -82,7 +83,11 @@ class ScienceProcess(cpl.ui.PyRecipe):
         for idx, frame in enumerate(raw_science_frames):
             if idx == 0:
                 header = cpl.core.PropertyList.load(frame.file, 0)
-
+                pattern = r'value\s+:\s+(\d+)'
+                exp_time_list = cpl.core.PropertyList.load_regexp(frame.file, 0, "EXPTIME", False)
+                exp_time = cpl.core.PropertyList.dump(exp_time_list)
+                match = re.search(pattern, exp_time)
+                dark_image.multiply_scalar(float(match.group(1)))
             raw_science_image = cpl.core.Image.load(frame.file)
 
             raw_science_image.subtract(bias_image)
