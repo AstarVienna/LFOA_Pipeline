@@ -86,6 +86,7 @@ class FlatProcess(cpl.ui.PyRecipe):
 
         if dark_frame:
             dark_image = cpl.core.Image.load(dark_frame.file)
+
         cpl.core.Msg.warning(
             self.name,
             f"Preparing flat field."

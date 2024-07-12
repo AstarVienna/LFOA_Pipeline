@@ -5,3 +5,4 @@ recipes/test.py
 recipes/metis_dark_det.py
 *.xml
 .vscode
+.idea

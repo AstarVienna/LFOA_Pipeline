@@ -2,6 +2,8 @@ from cpl import core, ui, dfs, drs
 
 from typing import Any, Dict
 
+import numpy as np
+
 class Photometry(ui.PyRecipe):
     _name = "photometry"
     _version = "0.1"
@@ -15,7 +17,7 @@ class Photometry(ui.PyRecipe):
         super().__init__(*args, **kwargs)
         self.parameters = ui.ParameterList(
             (
-            )
+            ),
         )
 
     def run(self, frameset: ui.FrameSet, settings: Dict[str, Any]) -> ui.FrameSet:

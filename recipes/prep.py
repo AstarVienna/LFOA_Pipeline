@@ -14,7 +14,15 @@ class RawPrep(ui.PyRecipe):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.parameters = ui.ParameterList(
-            (),
+            (
+                ui.ParameterEnum(
+                    name = "mflat.stacking.method",
+                    context = "mflat",
+                    description = "Method used for averaging",
+                    default = "mean",
+                    alternatives = ("mean", "median"),
+                ),
+            )
         )
     
     def run(self, frameset:ui.FrameSet, settings: Dict[str, Any]) -> ui.FrameSet:
@@ -22,12 +30,17 @@ class RawPrep(ui.PyRecipe):
         choosen_frames = ui.FrameSet()
         product_frames = ui.FrameSet()
 
-        for frame in frameset:
+        output_file = "CHOSEN_FLAT.fits"
+
+        for idx, frame in enumerate(frameset):
             if frame.tag == "FLAT":
+                if idx == 0:
+                    header = core.PropertyList.load(frame.file, 0)
                 frame.group = ui.Frame.FrameGroup.RAW
                 raw_flat_image = core.Image.load(frame.file)
                 noise, error = drs.detector.get_noise_window(raw_flat_image)
-                if noise < 63:
+                print(noise)
+                if noise < 200:
                     choosen_frames.append(frame)
 
                     product_properties = core.PropertyList()
@@ -45,14 +58,16 @@ class RawPrep(ui.PyRecipe):
                         self.name,
                         product_properties,
                         f"demo/{self.version!r}",
-                        frame.file,
+                        output_file[:11]+f"_{idx}"+output_file[11:],
+                        header=header,
+                        inherit=frame,
                     )
 
                     product_frames.append(
                         ui.Frame(
-                            file=frame.file,
+                            file=output_file[:11]+f"_{idx}"+output_file[11:],
                             tag="FLAT",
-                            group=ui.Frame.FrameGroup.CALIB,
+                            group=ui.Frame.FrameGroup.RAW,
                         )
                     )
 
