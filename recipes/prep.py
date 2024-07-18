@@ -2,6 +2,8 @@ from cpl import core, ui, dfs, drs
 
 from typing import Any, Dict
 
+import re
+
 class RawPrep(ui.PyRecipe):
     _name = "raw_prep"
     _version = "0.1"
@@ -26,7 +28,15 @@ class RawPrep(ui.PyRecipe):
         )
     
     def run(self, frameset:ui.FrameSet, settings: Dict[str, Any]) -> ui.FrameSet:
-
+        for key, value in settings.items():
+            try:
+                self.parameters[key].value = value
+            except KeyError:
+                    core.Msg.warning(
+                        self._name,
+                        f"Settings includes {key}:{value} but {self} has no parameter named {key}.",
+                    )
+        
         choosen_frames = ui.FrameSet()
         product_frames = ui.FrameSet()
 
@@ -36,19 +46,26 @@ class RawPrep(ui.PyRecipe):
             if frame.tag == "FLAT":
                 if idx == 0:
                     header = core.PropertyList.load(frame.file, 0)
+                    pattern = r"value\s+:\s+(\d+)"
+                    exp_time_list = core.PropertyList.load_regexp(frame.file, 0, "EXPTIME", False)
+                    exp_time = exp_time_list.dump(show=False)
+                    print(exp_time)
+                    match = re.search(pattern, exp_time).group(1) # type: ignore
                 frame.group = ui.Frame.FrameGroup.RAW
                 raw_flat_image = core.Image.load(frame.file)
                 noise, error = drs.detector.get_noise_window(raw_flat_image)
-                print(noise)
-                if noise < 200:
+                if noise < 62:
                     choosen_frames.append(frame)
 
                     product_properties = core.PropertyList()
                     product_properties.append(
-                        core.Property("NOISE", f"{noise}"))
+                        core.Property("NOISE", noise))
                     product_properties.append(
                         core.Property("ESO PRO CATG", core.Type.STRING, r"OBJECT_REDUCED")
-                    )    
+                    )
+                    product_properties.append(
+                        core.Property("EXPTIME", core.Type.STRING, f"{match}")
+                    )
 
                     dfs.save_image(
                         frameset,
@@ -60,7 +77,7 @@ class RawPrep(ui.PyRecipe):
                         f"demo/{self.version!r}",
                         output_file[:11]+f"_{idx}"+output_file[11:],
                         header=header,
-                        inherit=frame,
+                        inherit=frame,  
                     )
 
                     product_frames.append(

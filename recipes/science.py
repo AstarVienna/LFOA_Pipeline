@@ -6,6 +6,8 @@ import re
 
 from typing import Any, Dict
 
+from numpy import mat
+
 class ScienceProcess(cpl.ui.PyRecipe):
     _name = "science_processor"
     _version = "0.1"
@@ -87,7 +89,7 @@ class ScienceProcess(cpl.ui.PyRecipe):
                 exp_time_list = cpl.core.PropertyList.load_regexp(frame.file, 0, "EXPTIME", False)
                 exp_time = cpl.core.PropertyList.dump(exp_time_list, show=False)
                 match = re.search(pattern, exp_time)
-                dark_image.multiply_scalar(float(match.group(1)))
+                dark_image.multiply_scalar(float(match.group(1))) # type: ignore
             raw_science_image = cpl.core.Image.load(frame.file)
 
             raw_science_image.subtract(bias_image)
@@ -108,6 +110,9 @@ class ScienceProcess(cpl.ui.PyRecipe):
         product_properties = cpl.core.PropertyList()
         product_properties.append(
             cpl.core.Property("ESO PRO CATG", cpl.core.Type.STRING, r"OBJECT_REDUCED")
+        )
+        product_properties.append(
+            cpl.core.Property("EXPTIME", float(match.group(1))) # type:ignore
         )
 
         cpl.core.Msg.info(self.name, f"Saving product file as {output_file!r}.")
