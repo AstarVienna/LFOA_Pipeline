@@ -2,3 +2,6 @@ parameter_set:
   is default: yes
   workflow_parameters:
     use_standard_stars: "TRUE"
+  recipe_parameters:
+    prep:
+      prep.low.noise: 5.0

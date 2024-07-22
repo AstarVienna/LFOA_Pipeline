@@ -3,7 +3,7 @@ from cpl import core, ui, dfs, drs
 from typing import Any, Dict
 
 import numpy as np
-import re
+from recipes.figl_functions import *
 
 class Photometry(ui.PyRecipe):
     _name = "photometry"
@@ -23,12 +23,8 @@ class Photometry(ui.PyRecipe):
 
     def run(self, frameset: ui.FrameSet, settings: Dict[str, Any]) -> ui.FrameSet:
 
-        
-
         object_frame = ui.FrameSet()
-        standard_frame = ui.FrameSet()
-
-        
+        standard_frame = ui.FrameSet()      
 
         mag_v_land = 13.691
         mag_r_land = 13.367
@@ -38,23 +34,17 @@ class Photometry(ui.PyRecipe):
         # Assume the brightest Standard star is used
 
         for frame in frameset:
-            obj_typ_list = core.PropertyList.load_regexp(frame.file, 0, "OBJTYP", False)
-            obj_typ = obj_typ_list.dump(show=False)
-            match_obj = re.search(pattern, obj_type).group(1) # type: ignore
-            exp_time_list = core.PropertyList.load_regexp(frame.file, 0, "EXPTIME", False)
-            exp_time = core.PropertyList.dump(exp_time_list, show=False)
-            match_exp = float(re.search(pattern, exp_time).group(1)) # type: ignore
+            match_obj = obj(frame.file)
+            match_exp = exp(frame.file)
             if match_obj == "Landold":
                 input_image = core.Image.load(frame.file)
                 apertures = drs.Apertures.extract_sigma(input_image, 6.0)
                 brightness = apertures.get_flux(1)
                 m_inst = -2.5*np.log10(brightness/match_exp)
-                filter_typ_list = core.PropertyList.load.regexp(frame.file, 0, "FILTER", False)
-                filter_typ = filter_typ_list.dump(show=False)
-                match_filter = re.search(pattern, filter_typ).group(1) # type: ignore
-                if match_filter == "Bessle R":
+                match_filter = filter_match(frame.file)
+                if match_filter == "Bessel R":
                     ZP_R = mag_r_land - m_inst
-                elif match_filter == "Bessle V":
+                elif match_filter == "Bessel V":
                     ZP_V = mag_v_land - m_inst
             if match_obj == "Supernova":
                 input_image = core.Image.load(frame.file)

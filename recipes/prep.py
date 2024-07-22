@@ -2,6 +2,8 @@ from cpl import core, ui, dfs, drs
 
 from typing import Any, Dict
 
+from ..recipes.figl_functions import *
+
 import re
 
 class RawPrep(ui.PyRecipe):
@@ -17,12 +19,11 @@ class RawPrep(ui.PyRecipe):
         super().__init__(*args, **kwargs)
         self.parameters = ui.ParameterList(
             (
-                ui.ParameterEnum(
-                    name = "mflat.stacking.method",
-                    context = "mflat",
-                    description = "Method used for averaging",
-                    default = "mean",
-                    alternatives = ("mean", "median"),
+                ui.ParameterValue(
+                    name = "prep.low.noise",
+                    context = "prep",
+                    description = "Maximum value of accepted noise",
+                    default = 125.0
                 ),
             )
         )
@@ -46,41 +47,41 @@ class RawPrep(ui.PyRecipe):
             if frame.tag == "FLAT":
                 if idx == 0:
                     header = core.PropertyList.load(frame.file, 0)
-                    pattern = r"value\s+:\s+(\d+)"
-                    exp_time_list = core.PropertyList.load_regexp(frame.file, 0, "EXPTIME", False)
-                    exp_time = exp_time_list.dump(show=False)
-                    print(exp_time)
-                    match = re.search(pattern, exp_time).group(1) # type: ignore
+                    match = exp(frame.file)
                 frame.group = ui.Frame.FrameGroup.RAW
                 raw_flat_image = core.Image.load(frame.file)
                 noise, error = drs.detector.get_noise_window(raw_flat_image)
-                if noise < 62:
-                    choosen_frames.append(frame)
-
-                    product_properties = core.PropertyList()
-                    product_properties.append(
-                        core.Property("NOISE", noise))
-                    product_properties.append(
-                        core.Property("ESO PRO CATG", core.Type.STRING, r"OBJECT_REDUCED")
-                    )
-                    product_properties.append(
-                        core.Property("EXPTIME", core.Type.STRING, f"{match}")
-                    )
-
-                    dfs.save_image(
-                        frameset,
-                        self.parameters,
-                        frameset,
-                        raw_flat_image,
-                        self.name,
-                        product_properties,
-                        f"demo/{self.version!r}",
-                        output_file[:11]+f"_{idx}"+output_file[11:],
-                        header=header,
-                        inherit=frame,  
-                    )
-
+                core.Msg.info(
+                    self.name,
+                    "Choosing Flats."
+                )
+                product_properties = core.PropertyList()
+                product_properties.append(
+                    core.Property("NOISE", noise))
+                product_properties.append(
+                    core.Property("ESO PRO CATG", core.Type.STRING, r"OBJECT_REDUCED"))
+                product_properties.append(
+                    core.Property("EXPTIME", core.Type.STRING, f"{match}"))
+                dfs.save_image(
+                    frameset,
+                    self.parameters,
+                    frameset,
+                    raw_flat_image,
+                    self.name,
+                    product_properties,
+                    f"demo/{self.version!r}",
+                    output_file[:11]+f"_{idx}"+output_file[11:],
+                    inherit=frame,  
+                )
+                if noise < self.parameters['prep.low.noise'].value:
                     product_frames.append(
+                        ui.Frame(
+                            file=output_file[:11]+f"_{idx}"+output_file[11:],
+                            tag="CHOOSEN_FLAT",
+                            group=ui.Frame.FrameGroup.RAW,
+                        )
+                    )
+                product_frames.append(
                         ui.Frame(
                             file=output_file[:11]+f"_{idx}"+output_file[11:],
                             tag="FLAT",
