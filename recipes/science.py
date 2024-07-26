@@ -3,7 +3,6 @@ import cpl.ui
 import cpl.dfs
 import cpl.drs
 import re
-from ..recipes.figl_functions import *
 
 from typing import Any, Dict
 
@@ -44,11 +43,18 @@ class ScienceProcess(cpl.ui.PyRecipe):
 
         output_file = "SCIENCE_FRAME.fits"
 
+        pattern_strg = r"value\s+:\s+'(\w+)'"
+        pattern_fil = r"value\s+:\s+'(\w+\s\w)'"
+        pattern_doub = r"value\s+:\s+(\d+)"
+
         raw_science_frames = cpl.ui.FrameSet()
         bias_frame = None
         dark_frame = None
         flat_frame = None
-        product_frames = cpl.ui.FrameSet()
+        object_images = cpl.core.ImageList()
+        object_products = cpl.ui.FrameSet()
+
+        method = self.parameters["mflat.stacking.method"].value
 
         for frame in frameset:
             if frame.tag == "SCIENCE":
@@ -74,7 +80,6 @@ class ScienceProcess(cpl.ui.PyRecipe):
                 self.name,
                 f"No raw frames in frameset."
             )
-        processed_science_images = cpl.core.ImageList()
 
         if bias_frame:
             bias_image = cpl.core.Image.load(bias_frame.file)
@@ -83,60 +88,70 @@ class ScienceProcess(cpl.ui.PyRecipe):
         if flat_frame:
             flat_image = cpl.core.Image.load(flat_frame.file)
 
+
         for idx, frame in enumerate(raw_science_frames):
             if idx == 0:
-                header = cpl.core.PropertyList.load(frame.file, 0)
-                pattern = r'value\s+:\s+(\d+)'
-                match = exp(frame.file)
-                dark_image.multiply_scalar(float(match.group(1))) # type: ignore
-            raw_science_image = cpl.core.Image.load(frame.file)
+                exp_time_list = cpl.core.PropertyList.load_regexp(frame.file, 0, "EXPTIME", False)
+                exp_time = cpl.core.PropertyList.dump(exp_time_list, show=False)
+                match_exp = float(re.search(pattern_doub, exp_time).group(1)) # type: ignore
+                dark_image.multiply_scalar(match_exp) # type: ignore
 
-            raw_science_image.subtract(bias_image)
-            raw_science_image.subtract(dark_image)
-            raw_science_image.divide(flat_image)
+            obj_typ_list = cpl.core.PropertyList.load_regexp(frame.file, 0, "OBJTYP", False)
+            obj_typ = obj_typ_list.dump(show=False)
+            match_obj = re.search(pattern_strg, obj_typ).group(1) # type: ignore
 
-            processed_science_images.insert(idx, raw_science_image)
+            if match_obj == "Supernova":
 
-        combined_image = None
+                raw_science_image = cpl.core.Image.load(frame.file)
 
-        method = self.parameters["mflat.stacking.method"].value
+                raw_science_image.subtract(bias_image)
+                raw_science_image.subtract(dark_image)
+                raw_science_image.divide(flat_image)
 
-        if method == "mean":
-            combined_image = processed_science_images.collapse_create()
-        elif method == "median":
-            combined_image = processed_science_images.collapse_median_create()
+                object_images.append(raw_science_image)
+
+                filter_typ_list = cpl.core.PropertyList.load_regexp(frame.file, 0, "FILTER", False)
+                filter_typ = filter_typ_list.dump(show=False)
+                match_filter = re.search(pattern_fil, filter_typ).group(1) # type: ignore
 
         product_properties = cpl.core.PropertyList()
         product_properties.append(
             cpl.core.Property("ESO PRO CATG", cpl.core.Type.STRING, r"OBJECT_REDUCED")
         )
         product_properties.append(
-            cpl.core.Property("EXPTIME", float(match.group(1))) # type:ignore
+            cpl.core.Property("EXPTIME", match_exp)
+        )
+        product_properties.append(
+            cpl.core.Property("OBJTYP", "Supernova")
+        )
+        product_properties.append(
+            cpl.core.Property("FILTER", match_filter)
         )
 
-        cpl.core.Msg.info(self.name, f"Saving product file as {output_file!r}.")
+        if method == "mean":
+            combined_object_image = object_images.collapse_create()
+
+        elif method == "median":
+            combined_object_image = object_images.collapse_median_create()
 
         cpl.dfs.save_image(
             frameset,
             self.parameters,
             frameset,
-            combined_image,
+            combined_object_image,
             self.name,
             product_properties,
             f"demo/{self.version!r}",
             output_file,
-            header=header,
         )
 
-        product_frames.append(
+        object_products.append(
             cpl.ui.Frame(
                 file=output_file,
                 tag="SCIENCE_FRAME",
-                group=cpl.ui.Frame.FrameGroup.PRODUCT,
-                level=cpl.ui.Frame.FrameLevel.INTERMEDIATE,
-                frameType=cpl.ui.Frame.FrameType.IMAGE,
+                group=cpl.ui.Frame.FrameGroup.RAW,
             )
         )
 
-        return product_frames
+        return object_products
 

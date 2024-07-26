@@ -2,8 +2,6 @@ from cpl import core, ui, dfs, drs
 
 from typing import Any, Dict
 
-from ..recipes.figl_functions import *
-
 import re
 
 class RawPrep(ui.PyRecipe):
@@ -23,7 +21,7 @@ class RawPrep(ui.PyRecipe):
                     name = "prep.low.noise",
                     context = "prep",
                     description = "Maximum value of accepted noise",
-                    default = 125.0
+                    default = 126.0
                 ),
             )
         )
@@ -38,16 +36,18 @@ class RawPrep(ui.PyRecipe):
                         f"Settings includes {key}:{value} but {self} has no parameter named {key}.",
                     )
         
-        choosen_frames = ui.FrameSet()
         product_frames = ui.FrameSet()
 
-        output_file = "CHOSEN_FLAT.fits"
+        output_file = "FLAT.fits"
+
+        pattern = r'value\s+:\s+(\d+)'
 
         for idx, frame in enumerate(frameset):
             if frame.tag == "FLAT":
                 if idx == 0:
-                    header = core.PropertyList.load(frame.file, 0)
-                    match = exp(frame.file)
+                    exp_time_list = core.PropertyList.load_regexp(frame.file, 0, "EXPTIME", False)
+                    exp_time = core.PropertyList.dump(exp_time_list, show=False)
+                    match_exp = float(re.search(pattern, exp_time).group(1)) # type: ignore
                 frame.group = ui.Frame.FrameGroup.RAW
                 raw_flat_image = core.Image.load(frame.file)
                 noise, error = drs.detector.get_noise_window(raw_flat_image)
@@ -61,7 +61,7 @@ class RawPrep(ui.PyRecipe):
                 product_properties.append(
                     core.Property("ESO PRO CATG", core.Type.STRING, r"OBJECT_REDUCED"))
                 product_properties.append(
-                    core.Property("EXPTIME", core.Type.STRING, f"{match}"))
+                    core.Property("EXPTIME", match_exp))
                 dfs.save_image(
                     frameset,
                     self.parameters,
@@ -77,17 +77,18 @@ class RawPrep(ui.PyRecipe):
                     product_frames.append(
                         ui.Frame(
                             file=output_file[:11]+f"_{idx}"+output_file[11:],
-                            tag="CHOOSEN_FLAT",
+                            tag="CHOSEN_FLAT",
                             group=ui.Frame.FrameGroup.RAW,
                         )
                     )
-                product_frames.append(
-                        ui.Frame(
-                            file=output_file[:11]+f"_{idx}"+output_file[11:],
-                            tag="FLAT",
-                            group=ui.Frame.FrameGroup.RAW,
+                if noise > self.parameters['prep.low.noise'].value:
+                    product_frames.append(
+                            ui.Frame(
+                                file=output_file[:11]+f"_{idx}"+output_file[11:],
+                                tag="FLAT",
+                                group=ui.Frame.FrameGroup.RAW,
+                            )
                         )
-                    )
 
         return product_frames
     

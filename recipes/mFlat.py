@@ -4,8 +4,6 @@ import cpl.dfs
 import cpl.drs
 import re
 
-from ..recipes.figl_functions import *
-
 from typing import Any, Dict
 
 class FlatProcess(cpl.ui.PyRecipe):
@@ -49,8 +47,10 @@ class FlatProcess(cpl.ui.PyRecipe):
         dark_frame = None
         product_frames = cpl.ui.FrameSet()
 
+        pattern = r'value\s+:\s+(\d+)'
+
         for frame in frameset:
-            if frame.tag == "FLAT":
+            if frame.tag == "CHOSEN_FLAT":
                 frame.group = cpl.ui.Frame.FrameGroup.RAW
                 raw_flat_frames.append(frame)
             elif frame.tag == "MASTER_BIAS":
@@ -95,9 +95,10 @@ class FlatProcess(cpl.ui.PyRecipe):
         )
         for idx, frame in enumerate(raw_flat_frames):
             if idx == 0:
-                header = cpl.core.PropertyList.load(frame.file, 0)
-                match = exp(frame.file)
-                dark_image.multiply_scalar(float(match))
+                exp_time_list = cpl.core.PropertyList.load_regexp(frame.file, 0, "EXPTIME", False)
+                exp_time = exp_time_list.dump(show=True)
+                match_exp = float(re.search(pattern, exp_time).group(1)) # type: ignore
+                dark_image.multiply_scalar(match_exp)
             raw_flat_image = cpl.core.Image.load(frame.file)
 
             raw_flat_image.subtract(bias_image)

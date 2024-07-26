@@ -1,12 +1,12 @@
 from edps import task, data_source, classification_rule
-from . import figl_rules as rules
 
 # Classification rules
 bias_class = classification_rule("BIAS", {"IMAGETYP": "bias"})
 dark_class = classification_rule("DARK", {"IMAGETYP": "dark"})
 prep_class = classification_rule("FLAT", {"IMAGETYP": "flat"})
 science_class = classification_rule("SCIENCE", {"IMAGETYP": "object"})
-noise_level = classification_rule("CHOOSEN_FLAT")
+landold_class = classification_rule("STANDARD", {"IMAGETYP": "object", "OBJTYP": "Landold"})
+noise_level = classification_rule("CHOSEN_FLAT")
 
 # Data Sources
 raw_bias = (data_source("BIAS")
@@ -24,8 +24,13 @@ raw_prep = (data_source("FLAT")
             .with_grouping_keywords(["DATE-OBS"])
             .with_match_keywords(["ORIGIN", "FILTER", "EXPTIME"])
             .build())
+raw_landold = (data_source("STANDARD")
+               .with_classification_rule(landold_class)
+               .with_match_keywords(["FILTER"])
+               .build())
 raw_science = (data_source("SCIENCE")
               .with_classification_rule(science_class)
+              .with_match_keywords(["FILTER"])
               #.with_grouping_keywords(["DATE-OBS"])
               .build())
 # Process Task
@@ -60,7 +65,17 @@ science_task = (task("science")
                 .with_associated_input(flat_task)
                 .build())
 
+landold_task = (task("landold")
+                .with_recipe("standard_processor")
+                .with_main_input(raw_landold)
+                .with_associated_input(bias_task)
+                .with_associated_input(dark_task)
+                .with_associated_input(flat_task)
+                .build())
+
+
 photometry_task = (task("photometry")
                    .with_recipe("photometry")
                    .with_main_input(science_task)
+                   .with_associated_input(landold_task)
                    .build())
