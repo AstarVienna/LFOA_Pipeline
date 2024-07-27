@@ -34,11 +34,6 @@ class Photometry(cpl.ui.PyRecipe):
 
         output_file = "SCIENCE_FRAME.fits"
         output_frame = cpl.ui.FrameSet()
-        mag_v_land = 13.691
-        mag_r_land = 13.367
-
-        zp_r = None
-        zp_v = None
 
         pattern_doub = r'value\s+:\s+(\d+)'
         pattern_strg = r"value\s+:\s+'(\w+)'"
@@ -48,47 +43,39 @@ class Photometry(cpl.ui.PyRecipe):
 
         for frame in frameset:
             frame.group = cpl.ui.Frame.FrameGroup.RAW
-            obj_typ_list = cpl.core.PropertyList.load_regexp(frame.file, 0, "OBJTYP", False)
-            obj_typ = obj_typ_list.dump(show=False)
-            match_obj = re.search(pattern_strg, obj_typ).group(1) # type: ignore
-            exp_time_list = cpl.core.PropertyList.load_regexp(frame.file, 0, "EXPTIME", False)
-            exp_time = cpl.core.PropertyList.dump(exp_time_list, show=False)
-            match_exp = float(re.search(pattern_doub, exp_time).group(1)) # type: ignore
-            if match_obj == "Landold":
-                input_image = cpl.core.Image.load(frame.file)
-                apertures = cpl.drs.Apertures.extract_sigma(input_image, 6.0)
-                brightness = apertures.get_flux(1)
-                m_inst = -2.5*np.log10(brightness/match_exp)
-                filter_typ_list = cpl.core.PropertyList.load_regexp(frame.file, 0, "FILTER", False)
-                filter_typ = filter_typ_list.dump(show=False)
-                match_filter = re.search(pattern_fil, filter_typ).group(1) # type: ignore
-                if match_filter == "Bessel R":
-                    zp_r = mag_r_land - m_inst
-                elif match_filter == "Bessel V":
-                    zp_v = mag_v_land - m_inst
+            if frame.tag == "STANDARD_FRAME":
+                zp_list = cpl.core.PropertyList.load_regexp(frame.file, 0, "ZEROPOINT", False)
+                zp_val = zp_list.dump(show=False)
+                zp_match = float(re.search(pattern_doub, zp_val).group(1)) # type: ignore
+                ZP = zp_match
         for frame in frameset:
             frame.group = cpl.ui.Frame.FrameGroup.RAW
-            obj_typ_list = cpl.core.PropertyList.load_regexp(frame.file, 0, "OBJTYP", False)
-            obj_typ = obj_typ_list.dump(show=False)
-            match_obj = re.search(pattern_strg, obj_typ).group(1) # type: ignore
-            exp_time_list = cpl.core.PropertyList.load_regexp(frame.file, 0, "EXPTIME", False)
-            exp_time = cpl.core.PropertyList.dump(exp_time_list, show=False)
-            match_exp = float(re.search(pattern_doub, exp_time).group(1)) # type: ignore
-            if match_obj == "Supernova":
+            if frame.tag == "SCIENCE_FRAME":
+                obj_typ_list = cpl.core.PropertyList.load_regexp(frame.file, 0, "OBJTYP", False)
+                obj_typ = obj_typ_list.dump(show=False)
+                match_obj = re.search(pattern_strg, obj_typ).group(1) # type: ignore
+                exp_time_list = cpl.core.PropertyList.load_regexp(frame.file, 0, "EXPTIME", False)
+                exp_time = cpl.core.PropertyList.dump(exp_time_list, show=False)
+                match_exp = float(re.search(pattern_doub, exp_time).group(1)) # type: ignore
+            
                 input_image = cpl.core.Image.load(frame.file)
-                apertures = cpl.drs.Apertures.extract_sigma(input_image, 6.0)   
+                apertures = cpl.drs.Apertures.extract_sigma(input_image, 32.0)
+                apertures.sort_by_flux()
                 brightness = apertures.get_flux(1)
                 filter_typ_list = cpl.core.PropertyList.load_regexp(frame.file, 0, "FILTER", False)
                 filter_typ = filter_typ_list.dump(show=False)
                 match_filter = re.search(pattern_fil, filter_typ).group(1) # type: ignore
-                if match_filter == "Bessel R":
-                    mag = -2.5 * np.log10(brightness / match_exp) + zp_r
-                elif match_filter == "Bessel V":
-                    mag = -2.5 * np.log10(brightness / match_exp) + zp_v
+                mag = -2.5 * np.log10(brightness / match_exp) + ZP
 
                 product_properties = cpl.core.PropertyList()
                 product_properties.append(
                     cpl.core.Property("MAGNITUDE", mag))
+                product_properties.append(
+                    cpl.core.Property("OBJTYP", match_obj))
+                product_properties.append(
+                    cpl.core.Property("EXPTIME", match_exp))
+                product_properties.append(
+                    cpl.core.Property("FILTER", match_filter))
                 product_properties.append(
                     cpl.core.Property("ESO PRO CATG", cpl.core.Type.STRING, r"OBJECT_REDUCED")) 
 

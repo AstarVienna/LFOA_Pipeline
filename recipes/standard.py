@@ -57,7 +57,7 @@ class StandardProcessor(cpl.ui.PyRecipe):
         method = self.parameters["mflat.stacking.method"].value
 
         for frame in frameset:
-            if frame.tag == "STANDARD":
+            if frame.tag == "SCIENCE":
                 frame.group = cpl.ui.Frame.FrameGroup.RAW
                 raw_science_frames.append(frame)
             elif frame.tag == "MASTER_BIAS":
@@ -144,8 +144,8 @@ class StandardProcessor(cpl.ui.PyRecipe):
         standard_products.append(
             cpl.ui.Frame(
                 file=output_file,
-                tag="SCIENCE_FRAME",
-                group=cpl.ui.Frame.FrameGroup.RAW,
+                tag="STANDARD_FRAME",
+                group=cpl.ui.Frame.FrameGroup.FINAL,
             )
         )
 

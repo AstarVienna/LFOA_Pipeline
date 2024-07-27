@@ -4,8 +4,8 @@ from edps import task, data_source, classification_rule
 bias_class = classification_rule("BIAS", {"IMAGETYP": "bias"})
 dark_class = classification_rule("DARK", {"IMAGETYP": "dark"})
 prep_class = classification_rule("FLAT", {"IMAGETYP": "flat"})
-science_class = classification_rule("SCIENCE", {"IMAGETYP": "object"})
-landold_class = classification_rule("STANDARD", {"IMAGETYP": "object", "OBJTYP": "Landold"})
+science_class = classification_rule("SCIENCE", {"IMAGETYP": "object", "OBJTYP": "Supernova"})
+landold_class = classification_rule("SCIENCE", {"IMAGETYP": "object", "OBJTYP": "Landold"})
 noise_level = classification_rule("CHOSEN_FLAT")
 
 # Data Sources
@@ -66,16 +66,21 @@ science_task = (task("science")
                 .build())
 
 landold_task = (task("landold")
-                .with_recipe("standard_processor")
+                .with_recipe("science_processor")
                 .with_main_input(raw_landold)
                 .with_associated_input(bias_task)
                 .with_associated_input(dark_task)
                 .with_associated_input(flat_task)
                 .build())
 
+zero_point_task = (task("zp")
+                   .with_recipe("zero_point")
+                   .with_main_input(landold_task)
+                   .build())
+
 
 photometry_task = (task("photometry")
                    .with_recipe("photometry")
                    .with_main_input(science_task)
-                   .with_associated_input(landold_task)
+                   .with_associated_input(zero_point_task)
                    .build())

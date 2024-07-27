@@ -100,29 +100,25 @@ class ScienceProcess(cpl.ui.PyRecipe):
             obj_typ = obj_typ_list.dump(show=False)
             match_obj = re.search(pattern_strg, obj_typ).group(1) # type: ignore
 
-            if match_obj == "Supernova":
-
-                raw_science_image = cpl.core.Image.load(frame.file)
-
-                raw_science_image.subtract(bias_image)
-                raw_science_image.subtract(dark_image)
-                raw_science_image.divide(flat_image)
-
-                object_images.append(raw_science_image)
-
-                filter_typ_list = cpl.core.PropertyList.load_regexp(frame.file, 0, "FILTER", False)
-                filter_typ = filter_typ_list.dump(show=False)
-                match_filter = re.search(pattern_fil, filter_typ).group(1) # type: ignore
+        
+            raw_science_image = cpl.core.Image.load(frame.file)
+            raw_science_image.subtract(bias_image)
+            raw_science_image.subtract(dark_image)
+            raw_science_image.divide(flat_image)
+            object_images.append(raw_science_image)
+            filter_typ_list = cpl.core.PropertyList.load_regexp(frame.file, 0, "FILTER", False)
+            filter_typ = filter_typ_list.dump(show=False)
+            match_filter = re.search(pattern_fil, filter_typ).group(1) # type: ignore
 
         product_properties = cpl.core.PropertyList()
         product_properties.append(
             cpl.core.Property("ESO PRO CATG", cpl.core.Type.STRING, r"OBJECT_REDUCED")
         )
         product_properties.append(
-            cpl.core.Property("EXPTIME", match_exp)
+            cpl.core.Property("EXPTIME", cpl.core.Type.FLOAT, match_exp)
         )
         product_properties.append(
-            cpl.core.Property("OBJTYP", "Supernova")
+            cpl.core.Property("OBJTYP", match_obj)
         )
         product_properties.append(
             cpl.core.Property("FILTER", match_filter)
