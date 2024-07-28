@@ -6,7 +6,7 @@ import cpl.drs
 from typing import Any, Dict
 
 class BiasProcess(cpl.ui.PyRecipe):
-    _name = "mbias_processor"
+    _name = "bias_processor"
     _version = "0.1"
     _author = "Benjamin Eisele"
     _email = "benjamin.eisele0101@gmail.com"

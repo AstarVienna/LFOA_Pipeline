@@ -1,10 +1,12 @@
-from cpl import core, ui, dfs, drs
+import cpl.core
+import cpl.ui
+import cpl.dfs
+import cpl.drs
+import re
 
 from typing import Any, Dict
 
-import re
-
-class RawPrep(ui.PyRecipe):
+class RawPrep(cpl.ui.PyRecipe):
     _name = "raw_prep"
     _version = "0.1"
     _author = "Benjamin Eisele"
@@ -15,9 +17,9 @@ class RawPrep(ui.PyRecipe):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.parameters = ui.ParameterList(
+        self.parameters = cpl.ui.ParameterList(
             (
-                ui.ParameterValue(
+                cpl.ui.ParameterValue(
                     name = "prep.low.noise",
                     context = "prep",
                     description = "Maximum value of accepted noise",
@@ -26,17 +28,17 @@ class RawPrep(ui.PyRecipe):
             )
         )
     
-    def run(self, frameset:ui.FrameSet, settings: Dict[str, Any]) -> ui.FrameSet:
+    def run(self, frameset:cpl.ui.FrameSet, settings: Dict[str, Any]) -> cpl.ui.FrameSet:
         for key, value in settings.items():
             try:
                 self.parameters[key].value = value
             except KeyError:
-                    core.Msg.warning(
+                    cpl.core.Msg.warning(
                         self._name,
                         f"Settings includes {key}:{value} but {self} has no parameter named {key}.",
                     )
         
-        product_frames = ui.FrameSet()
+        product_frames = cpl.ui.FrameSet()
 
         output_file = "FLAT.fits"
 
@@ -44,25 +46,24 @@ class RawPrep(ui.PyRecipe):
 
         for idx, frame in enumerate(frameset):
             if frame.tag == "FLAT":
+                cpl.core.Msg.debug(self.name, f"Got raw flat frame: {frame.file}.")
                 if idx == 0:
-                    exp_time_list = core.PropertyList.load_regexp(frame.file, 0, "EXPTIME", False)
-                    exp_time = core.PropertyList.dump(exp_time_list, show=False)
+                    exp_time_list = cpl.core.PropertyList.load_regexp(frame.file, 0, "EXPTIME", False)
+                    exp_time = cpl.core.PropertyList.dump(exp_time_list, show=False)
                     match_exp = float(re.search(pattern, exp_time).group(1)) # type: ignore
-                frame.group = ui.Frame.FrameGroup.RAW
-                raw_flat_image = core.Image.load(frame.file)
-                noise, error = drs.detector.get_noise_window(raw_flat_image)
-                core.Msg.info(
-                    self.name,
-                    "Choosing Flats."
-                )
-                product_properties = core.PropertyList()
+                frame.group = cpl.ui.Frame.FrameGroup.RAW
+                raw_flat_image = cpl.core.Image.load(frame.file)
+                cpl.core.Msg.debug(self.name, f"Ascertaining noise of frame: {frame.file}.")
+                noise, error = cpl.drs.detector.get_noise_window(raw_flat_image)
+                product_properties = cpl.core.PropertyList()
                 product_properties.append(
-                    core.Property("NOISE", noise))
+                    cpl.core.Property("NOISE", noise))
                 product_properties.append(
-                    core.Property("ESO PRO CATG", core.Type.STRING, r"OBJECT_REDUCED"))
+                    cpl.core.Property("ESO PRO CATG", cpl.core.Type.STRING, r"OBJECT_REDUCED"))
                 product_properties.append(
-                    core.Property("EXPTIME", match_exp))
-                dfs.save_image(
+                    cpl.core.Property("EXPTIME", match_exp))
+                cpl.core.Msg.info(self.name, f"Saving chosen flat as {output_file!r}.")
+                cpl.dfs.save_image(
                     frameset,
                     self.parameters,
                     frameset,
@@ -75,18 +76,18 @@ class RawPrep(ui.PyRecipe):
                 )
                 if noise < self.parameters['prep.low.noise'].value:
                     product_frames.append(
-                        ui.Frame(
+                        cpl.ui.Frame(
                             file=output_file[:11]+f"_{idx}"+output_file[11:],
                             tag="CHOSEN_FLAT",
-                            group=ui.Frame.FrameGroup.RAW,
+                            group=cpl.ui.Frame.FrameGroup.RAW,
                         )
                     )
                 if noise > self.parameters['prep.low.noise'].value:
                     product_frames.append(
-                            ui.Frame(
+                            cpl.ui.Frame(
                                 file=output_file[:11]+f"_{idx}"+output_file[11:],
                                 tag="FLAT",
-                                group=ui.Frame.FrameGroup.RAW,
+                                group=cpl.ui.Frame.FrameGroup.RAW,
                             )
                         )
 

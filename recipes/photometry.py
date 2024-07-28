@@ -44,6 +44,7 @@ class Photometry(cpl.ui.PyRecipe):
         for frame in frameset:
             frame.group = cpl.ui.Frame.FrameGroup.RAW
             if frame.tag == "STANDARD_FRAME":
+                cpl.core.Msg.debug(self.name, f"Got standard frame: {frame.file}")
                 zp_list = cpl.core.PropertyList.load_regexp(frame.file, 0, "ZEROPOINT", False)
                 zp_val = zp_list.dump(show=False)
                 zp_match = float(re.search(pattern_doub, zp_val).group(1)) # type: ignore
@@ -51,6 +52,7 @@ class Photometry(cpl.ui.PyRecipe):
         for frame in frameset:
             frame.group = cpl.ui.Frame.FrameGroup.RAW
             if frame.tag == "SCIENCE_FRAME":
+                cpl.core.Msg.debug(self.name, f"Got science frame: {frame.file}")
                 obj_typ_list = cpl.core.PropertyList.load_regexp(frame.file, 0, "OBJTYP", False)
                 obj_typ = obj_typ_list.dump(show=False)
                 match_obj = re.search(pattern_strg, obj_typ).group(1) # type: ignore
@@ -59,6 +61,7 @@ class Photometry(cpl.ui.PyRecipe):
                 match_exp = float(re.search(pattern_doub, exp_time).group(1)) # type: ignore
             
                 input_image = cpl.core.Image.load(frame.file)
+                cpl.core.Msg.debug(self.name, "Calculating magnitude...")
                 apertures = cpl.drs.Apertures.extract_sigma(input_image, 32.0)
                 apertures.sort_by_flux()
                 brightness = apertures.get_flux(1)
@@ -78,6 +81,8 @@ class Photometry(cpl.ui.PyRecipe):
                     cpl.core.Property("FILTER", match_filter))
                 product_properties.append(
                     cpl.core.Property("ESO PRO CATG", cpl.core.Type.STRING, r"OBJECT_REDUCED")) 
+
+                cpl.core.Msg.info(self.name, f"Saving product file as {output_file!r}.")
 
                 cpl.dfs.save_image(
                     frameset,

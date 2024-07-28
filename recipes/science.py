@@ -59,15 +59,19 @@ class ScienceProcess(cpl.ui.PyRecipe):
         for frame in frameset:
             if frame.tag == "SCIENCE":
                 frame.group = cpl.ui.Frame.FrameGroup.RAW
+                cpl.core.Msg.debug(self.name, f"Got raw science frame: {frame.file}.")
                 raw_science_frames.append(frame)
             elif frame.tag == "MASTER_BIAS":
                 frame.group = cpl.ui.Frame.FrameGroup.CALIB
+                cpl.core.Msg.debug(self.name, f"Got master bias frame: {frame.file}.")
                 bias_frame = frame
             elif frame.tag == "MASTER_DARK":
                 frame.group = cpl.ui.Frame.FrameGroup.CALIB
+                cpl.core.Msg.debug(self.name, f"Got master dark frame: {frame.file}.")
                 dark_frame = frame
             elif frame.tag == "MASTER_FLAT":
                 frame.group = cpl.ui.Frame.FrameGroup.CALIB
+                cpl.core.Msg.debug(self.name, f"Got master flat frame: {frame.file}.")
                 flat_frame = frame
             else:
                 cpl.core.Msg.warning(
@@ -81,6 +85,11 @@ class ScienceProcess(cpl.ui.PyRecipe):
                 f"No raw frames in frameset."
             )
 
+        cpl.core.Msg.warning(
+            self.name,
+            f"Loading calib files."
+        )
+
         if bias_frame:
             bias_image = cpl.core.Image.load(bias_frame.file)
         if dark_frame:
@@ -90,6 +99,7 @@ class ScienceProcess(cpl.ui.PyRecipe):
 
 
         for idx, frame in enumerate(raw_science_frames):
+            cpl.core.Msg.info(self.name, f"Processing {frame.file!r}...")
             if idx == 0:
                 exp_time_list = cpl.core.PropertyList.load_regexp(frame.file, 0, "EXPTIME", False)
                 exp_time = cpl.core.PropertyList.dump(exp_time_list, show=False)
@@ -100,8 +110,9 @@ class ScienceProcess(cpl.ui.PyRecipe):
             obj_typ = obj_typ_list.dump(show=False)
             match_obj = re.search(pattern_strg, obj_typ).group(1) # type: ignore
 
-        
+            cpl.core.Msg.debug(self.name, f"Loading science image {idx}...")
             raw_science_image = cpl.core.Image.load(frame.file)
+            cpl.core.Msg.debug(self.name, f"Processing image {idx}...")
             raw_science_image.subtract(bias_image)
             raw_science_image.subtract(dark_image)
             raw_science_image.divide(flat_image)
@@ -124,11 +135,15 @@ class ScienceProcess(cpl.ui.PyRecipe):
             cpl.core.Property("FILTER", match_filter)
         )
 
+        cpl.core.Msg.info(self.name, f"Combining dark images using method {method!r}")
+
         if method == "mean":
             combined_object_image = object_images.collapse_create()
 
         elif method == "median":
             combined_object_image = object_images.collapse_median_create()
+
+        cpl.core.Msg.info(self.name, f"Saving product file as {output_file!r}.")
 
         cpl.dfs.save_image(
             frameset,

@@ -50,9 +50,11 @@ class DarkProcess(cpl.ui.PyRecipe):
         for frame in frameset:
             if frame.tag == "DARK":
                 frame.group = cpl.ui.Frame.FrameGroup.RAW
+                cpl.core.Msg.debug(self.name, f"Got raw dark frame: {frame.file}.")
                 raw_Dark_Frames.append(frame)
             elif frame.tag == "MASTER_BIAS":
                 frame.group = cpl.ui.Frame.FrameGroup.CALIB
+                cpl.core.Msg.debug(self.name, f"Got master bias frame: {frame.file}.")
                 bias_frame = frame
             else:
                 cpl.core.Msg.warning(
@@ -72,10 +74,12 @@ class DarkProcess(cpl.ui.PyRecipe):
             bias_image = cpl.core.Image.load(bias_frame.file)
 
         for idx, frame in enumerate(raw_Dark_Frames):
+            cpl.core.Msg.info(self.name, f"Processing {frame.file!r}...")
             if idx == 0:
                 exp_time_list = cpl.core.PropertyList.load_regexp(frame.file, 0, "EXPTIME", False)
                 exp_time = exp_time_list.dump(show=False)
                 match_exp = float(re.search(pattern, exp_time).group(1)) # type: ignore
+            cpl.core.Msg.debug(self.name, f"Loading dark image {idx}...")
             raw_dark_image = cpl.core.Image.load(frame.file)
 
             raw_dark_image.subtract(bias_image)
@@ -83,6 +87,8 @@ class DarkProcess(cpl.ui.PyRecipe):
             processed_dark_images.insert(idx, raw_dark_image)
 
         method = self.parameters["mdark.stacking.method"].value
+
+        cpl.core.Msg.info(self.name, f"Combining dark images using method {method!r}")
 
         if method == "mean":
             combined_image = processed_dark_images.collapse_create()
