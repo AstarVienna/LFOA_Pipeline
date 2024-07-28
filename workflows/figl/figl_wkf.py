@@ -35,7 +35,7 @@ raw_science = (data_source("SCIENCE")
               .build())
 # Process Task
 bias_task = (task("bias")
-            .with_recipe("mbias_processor")
+            .with_recipe("bias_processor")
             .with_main_input(raw_bias)
             .build())
 

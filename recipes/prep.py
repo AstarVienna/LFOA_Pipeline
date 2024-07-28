@@ -71,13 +71,13 @@ class RawPrep(cpl.ui.PyRecipe):
                     self.name,
                     product_properties,
                     f"demo/{self.version!r}",
-                    output_file[:11]+f"_{idx}"+output_file[11:],
+                    output_file[:4]+f"_{idx}"+output_file[4:],
                     inherit=frame,  
                 )
                 if noise < self.parameters['prep.low.noise'].value:
                     product_frames.append(
                         cpl.ui.Frame(
-                            file=output_file[:11]+f"_{idx}"+output_file[11:],
+                            file=output_file[:4]+f"_{idx}"+output_file[4:],
                             tag="CHOSEN_FLAT",
                             group=cpl.ui.Frame.FrameGroup.RAW,
                         )
@@ -85,7 +85,7 @@ class RawPrep(cpl.ui.PyRecipe):
                 if noise > self.parameters['prep.low.noise'].value:
                     product_frames.append(
                             cpl.ui.Frame(
-                                file=output_file[:11]+f"_{idx}"+output_file[11:],
+                                file=output_file[:4]+f"_{idx}"+output_file[4:],
                                 tag="FLAT",
                                 group=cpl.ui.Frame.FrameGroup.RAW,
                             )
