@@ -1,5 +1,6 @@
 from cpl import core, ui, dfs, drs
 
+from pathlib import Path
 from typing import Any, Dict
 
 import re
@@ -39,6 +40,7 @@ class RawPrep(ui.PyRecipe):
         product_frames = ui.FrameSet()
 
         output_file = "FLAT.fits"
+        poutput_file = Path(output_file)
 
         pattern = r'value\s+:\s+(\d+)'
 
@@ -62,6 +64,7 @@ class RawPrep(ui.PyRecipe):
                     core.Property("ESO PRO CATG", core.Type.STRING, r"OBJECT_REDUCED"))
                 product_properties.append(
                     core.Property("EXPTIME", match_exp))
+                poutput_file_idx = poutput_file.with_stem(f"{poutput_file.stem}_{idx}")
                 dfs.save_image(
                     frameset,
                     self.parameters,
@@ -70,13 +73,13 @@ class RawPrep(ui.PyRecipe):
                     self.name,
                     product_properties,
                     f"demo/{self.version!r}",
-                    output_file[:11]+f"_{idx}"+output_file[11:],
+                    str(poutput_file_idx),
                     inherit=frame,  
                 )
                 if noise < self.parameters['prep.low.noise'].value:
                     product_frames.append(
                         ui.Frame(
-                            file=output_file[:11]+f"_{idx}"+output_file[11:],
+                            file=str(poutput_file_idx),
                             tag="CHOSEN_FLAT",
                             group=ui.Frame.FrameGroup.RAW,
                         )
@@ -84,7 +87,7 @@ class RawPrep(ui.PyRecipe):
                 if noise > self.parameters['prep.low.noise'].value:
                     product_frames.append(
                             ui.Frame(
-                                file=output_file[:11]+f"_{idx}"+output_file[11:],
+                                file=str(poutput_file_idx),
                                 tag="FLAT",
                                 group=ui.Frame.FrameGroup.RAW,
                             )
