@@ -13,7 +13,7 @@ class FlatProcess(cpl.ui.PyRecipe):
     _email = "benjamin.eisele0101@gmail.com"
     _copyright = "GPL-3.0-or-later"
     _synopsis = "Basic Flat processor"
-    _description = "This recipe takes a number of raw flat frames, subtracts the bias and produces a master flat."
+    _description = "This recipe takes a number of chosen raw flat frames, subtracts the bias and dark to produce a master flat."
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -47,14 +47,19 @@ class FlatProcess(cpl.ui.PyRecipe):
         dark_frame = None
         product_frames = cpl.ui.FrameSet()
 
+        pattern = r'value\s+:\s+(\d+)'
+
         for frame in frameset:
-            if frame.tag == "FLAT":
+            if frame.tag == "CHOSEN_FLAT":
+                cpl.core.Msg.debug(self.name, f"Got raw flat frame: {frame.file}.")
                 frame.group = cpl.ui.Frame.FrameGroup.RAW
                 raw_flat_frames.append(frame)
             elif frame.tag == "MASTER_BIAS":
+                cpl.core.Msg.debug(self.name, f"Got master bias frame: {frame.file}.")
                 frame.group = cpl.ui.Frame.FrameGroup.CALIB
                 bias_frame = frame
             elif frame.tag == "MASTER_DARK":
+                cpl.core.Msg.debug(self.name, f"Got master dark frame: {frame.file}.")
                 frame.group = cpl.ui.Frame.FrameGroup.CALIB
                 dark_frame = frame
             else:
@@ -79,26 +84,15 @@ class FlatProcess(cpl.ui.PyRecipe):
         if bias_frame:
             bias_image = cpl.core.Image.load(bias_frame.file)
 
-        cpl.core.Msg.warning(
-            self.name,
-            f"Loading dark."
-        )
-
         if dark_frame:
             dark_image = cpl.core.Image.load(dark_frame.file)
-        cpl.core.Msg.warning(
-            self.name,
-            f"Preparing flat field."
-        )
+
         for idx, frame in enumerate(raw_flat_frames):
             if idx == 0:
-                header = cpl.core.PropertyList.load(frame.file, 0)
-                pattern = r'value\s+:\s+(\d+)'
                 exp_time_list = cpl.core.PropertyList.load_regexp(frame.file, 0, "EXPTIME", False)
-                exp_time = exp_time_list.dump(show=False)
-                match = re.search(pattern, exp_time)
-                dark_image.multiply_scalar(float(match.group(1)))
-
+                exp_time = exp_time_list.dump(show=True)
+                match_exp = float(re.search(pattern, exp_time).group(1)) # type: ignore
+                dark_image.multiply_scalar(match_exp)
             raw_flat_image = cpl.core.Image.load(frame.file)
 
             raw_flat_image.subtract(bias_image)
@@ -110,6 +104,8 @@ class FlatProcess(cpl.ui.PyRecipe):
         combined_image = None
 
         method = self.parameters["mflat.stacking.method"].value
+
+        cpl.core.Msg.info(self.name, f"Combining dark images using method {method!r}")
 
         if method == "mean":
             combined_image = processed_flat_images.collapse_create()
@@ -132,7 +128,6 @@ class FlatProcess(cpl.ui.PyRecipe):
             product_properties,
             f"demo/{self.version!r}",
             output_file,
-            header=header,
         )
 
         product_frames.append(

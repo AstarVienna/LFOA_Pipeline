@@ -39,6 +39,8 @@ class DarkProcess(cpl.ui.PyRecipe):
                     )
         
         output_file = "MASTER_DARK.fits"
+
+        pattern = r'value\s+:\s+(\d+)'
         
         raw_Dark_Frames = cpl.ui.FrameSet()
         bias_frame = None
@@ -48,9 +50,11 @@ class DarkProcess(cpl.ui.PyRecipe):
         for frame in frameset:
             if frame.tag == "DARK":
                 frame.group = cpl.ui.Frame.FrameGroup.RAW
+                cpl.core.Msg.debug(self.name, f"Got raw dark frame: {frame.file}.")
                 raw_Dark_Frames.append(frame)
             elif frame.tag == "MASTER_BIAS":
                 frame.group = cpl.ui.Frame.FrameGroup.CALIB
+                cpl.core.Msg.debug(self.name, f"Got master bias frame: {frame.file}.")
                 bias_frame = frame
             else:
                 cpl.core.Msg.warning(
@@ -70,28 +74,28 @@ class DarkProcess(cpl.ui.PyRecipe):
             bias_image = cpl.core.Image.load(bias_frame.file)
 
         for idx, frame in enumerate(raw_Dark_Frames):
+            cpl.core.Msg.info(self.name, f"Processing {frame.file!r}...")
             if idx == 0:
-                header = cpl.core.PropertyList.load(frame.file, 0)
-                pattern = r'value\s+:\s+(\d+)'
                 exp_time_list = cpl.core.PropertyList.load_regexp(frame.file, 0, "EXPTIME", False)
                 exp_time = exp_time_list.dump(show=False)
-                match = re.search(pattern, exp_time)
+                match_exp = float(re.search(pattern, exp_time).group(1)) # type: ignore
+            cpl.core.Msg.debug(self.name, f"Loading dark image {idx}...")
             raw_dark_image = cpl.core.Image.load(frame.file)
 
             raw_dark_image.subtract(bias_image)
 
             processed_dark_images.insert(idx, raw_dark_image)
 
-        combined_image = None
-
         method = self.parameters["mdark.stacking.method"].value
+
+        cpl.core.Msg.info(self.name, f"Combining dark images using method {method!r}")
 
         if method == "mean":
             combined_image = processed_dark_images.collapse_create()
         elif method == "median":
             combined_image = processed_dark_images.collapse_median_create()
 
-        combined_image.divide_scalar(float(match.group(1)))
+        combined_image.divide_scalar(match_exp) # type: ignore
 
         product_properties = cpl.core.PropertyList()
         product_properties.append(
@@ -109,7 +113,6 @@ class DarkProcess(cpl.ui.PyRecipe):
             product_properties,
             f"demo/{self.version!r}",
             output_file,
-            header=header,
         )
 
         product_frames.append(
