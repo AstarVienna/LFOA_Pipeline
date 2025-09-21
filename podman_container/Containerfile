@@ -1,0 +1,61 @@
+# Containerfile for EDPS_Tutorial on Fedora
+FROM ubuntu
+
+# Add user
+ENV USER edps_user
+ENV NB_UID 1000
+ENV HOME /home/edps_user
+ARG USER=edps_user
+ARG NB_UID=1000
+ARG HOME=/home/edps_user
+
+RUN useradd \
+    --create-home \
+    --shell /bin/bash \
+    ${USER}
+
+# 1. System updates & dependencies
+RUN apt-get update
+RUN apt-get install -y git python3-venv vim
+RUN apt-get install -y \
+	wget gcc automake autogen libtool gsl-bin libgsl-dev \
+	libfftw3-bin libfftw3-dev fftw-dev \
+	curl bzip2 less subversion git cppcheck lcov valgrind \
+	zlib1g zlib1g-dev \
+	liberfa1 liberfa-dev \
+	libcurl4-openssl-dev libcurl4 \
+	tmux ripgrep file \
+	libcfitsio-bin libcfitsio-dev \
+	wcslib-dev wcslib-tools \
+	libcpl-dev \
+	python3-astropy python3-matplotlib python3-numpy \
+	perl cmake \
+	graphviz meld \
+	python3-pip python3-full \
+	python3-jupyter-core python3-jupyter-client python3-notebook
+
+
+# 2. Clone the repo & create a venv
+USER ${USER}
+WORKDIR ${HOME}
+
+# 4. Install Python/ESO prerequisites
+RUN python3 -m venv edps_environment && \
+    . edps_environment/bin/activate && \
+    pip install --upgrade pip poetry && \
+    pip install --extra-index-url \
+    https://ftp.eso.org/pub/dfs/pipelines/libraries \
+    pycpl pyesorex edps adari_core
+
+RUN mkdir -p ${HOME}/Documents/Recipes ${HOME}/Documents/workflows/my_wkf
+
+# 5. Environment variables for METIS
+ENV PYCPL_RECIPE_DIR=${HOME}/Documents/Recipes \
+    PYESOREX_PLUGIN_DIR=${HOME}/Documents/Recipes
+
+RUN yes "" | edps_environment/bin/edps
+
+RUN sed -i -e "s|^workflow_dir=.*|workflow_dir=${HOME}/Documents/workflows|" ${HOME}/.edps/application.properties && \
+    sed -i -e "s|^esorex_path=.*|esorex_path=pyesorex|" ${HOME}/.edps/application.properties
+
+CMD ["/bin/bash"]
